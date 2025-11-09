@@ -1,0 +1,9 @@
+[package]
+name = "example-package"
+
+[repository]
+url = "https://github.com/user/repo.git"
+path = "/path/to/test/repo"
+
+[mode]
+operation = "read-only"
