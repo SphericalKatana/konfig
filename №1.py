@@ -1,40 +1,58 @@
+import toml
 import sys
-import argparse
-from config import DependencyVisualizerConfig
-from errors import *
+import os
+import subprocess
 
+def load_config(file_path):
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"Конфигурационный файл не найден: {file_path}")
+    try:
+        config = toml.load(file_path)
+        return config
+    except toml.TomlDecodeError as e:
+        raise ValueError(f"Ошибка парсинга TOML: {e}")
+
+def validate_config(config):
+    # Проверка наличия разделов и обязательных ключей
+    required_sections = ['package', 'repository', 'mode']
+    for section in required_sections:
+        if section not in config:
+            raise KeyError(f"Отсутствует раздел '{section}' в конфигурации")
+    # Проверка конкретных ключей
+    if 'name' not in config['package']:
+        raise KeyError("Отсутствует ключ 'name' в разделе [package]")
+    if 'url' not in config['repository']:
+        raise KeyError("Отсутствует ключ 'url' в разделе [repository]")
+    if 'operation' not in config['mode']:
+        raise KeyError("Отсутствует ключ 'operation' в разделе [mode]")
+
+    # Дополнительные проверки (например, URL допустим или нет)
+    url = config['repository']['url']
+    if not (url.startswith("http://") or url.startswith("https://") or os.path.exists(url)):
+        raise ValueError(f"Некорректный URL или путь: {url}")
+
+    # Проверка режима
+    mode = config['mode']['operation']
+    if mode not in ['read-only', 'write', 'test']:
+        raise ValueError(f"Недопустимый режим operation: {mode}")
+
+def print_config(config):
+    for section, params in config.items():
+        for key, value in params.items():
+            print(f"{section}.{key} = {value}")
 
 def main():
-    parser = argparse.ArgumentParser(description='Визуализатор графа зависимостей пакетов')
-    parser.add_argument('--config', '-c', default='config.toml',
-                        help='Путь к конфигурационному файлу (по умолчанию: config.toml)')
-
-    args = parser.parse_args()
-
+    config_path = 'config.toml'
     try:
-        # Загрузка и валидация конфигурации
-        config = DependencyVisualizerConfig(args.config)
-
-        # Вывод всех параметров (требование этапа 1)
-        config.display_parameters()
-
-        # Здесь будет основная логика визуализации графа зависимостей
-        print(f"\nАнализ пакета: {config.package_name}")
-        if config.test_mode:
-            print(f"Режим: тестовый (локальный путь: {config.local_path})")
-        else:
-            print(f"Режим: рабочий (URL: {config.repository_url})")
-
-    except ConfigError as e:
-        print(f"Ошибка конфигурации: {e}", file=sys.stderr)
-        sys.exit(1)
-    except KeyboardInterrupt:
-        print("\nПрервано пользователем", file=sys.stderr)
-        sys.exit(130)
+        config = load_config(config_path)
+        validate_config(config)
+        print("Настраиваемые параметры:")
+        print_config(config)
     except Exception as e:
-        print(f"Неожиданная ошибка: {e}", file=sys.stderr)
+        print(f"Ошибка: {e}")
         sys.exit(1)
 
+    # После успешного выполнения можно завершить работу
 
 if __name__ == "__main__":
     main()
